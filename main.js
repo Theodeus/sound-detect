@@ -72,9 +72,9 @@ navigator.mediaDevices.getUserMedia(constraints).then(function (mediaStream) {
 
     //This is the gate based noise detection, way cheaper than the AMDF above
     //the threshold should probably be based on the inital user recording, to see how hot their input is..
-    var chain1 = createAudioChain(context, 200, 2, 3);
-    var chain2 = createAudioChain(context, 400, 2, 6);
-    var chain3 = createAudioChain(context, 100, 2, 3);
+    var chain1 = createAudioChain(context, 100, 10, 3);
+    var chain2 = createAudioChain(context, 200, 10, 5);
+    var chain3 = createAudioChain(context, 300, 10, 5);
 
     mediaStreamSource.connect(chain1.input);
     mediaStreamSource.connect(chain2.input);
@@ -123,6 +123,7 @@ function createAudioChain(context, midFrequency, range, threshold) {
         if (energy / bufferLength > threshold) {
             console.log(midFrequency, "triggered with an energy value of", energy / bufferLength);
         }
+        draw();
         requestAnimationFrame(gateInput);
     }
 
@@ -130,6 +131,44 @@ function createAudioChain(context, midFrequency, range, threshold) {
     filter2.connect(filter3);
     filter3.connect(filter4);
     filter4.connect(gate);
+
+    /* VIZ */
+
+    var canvas = document.createElement("canvas");
+    var h2 = document.createElement("h2");
+    h2.innerHTML = midFrequency;
+    document.body.appendChild(h2);
+    document.body.appendChild(canvas);
+    var ctx = canvas.getContext("2d");
+
+    var x = void 0,
+        y = void 0,
+        v = void 0,
+        i = void 0,
+        sliceWidth = void 0;
+    function draw() {
+        ctx.fillStyle = 'rgb(200, 200, 200)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgb(0, 0, 0)';
+        ctx.beginPath();
+        sliceWidth = canvas.width * 1.0 / bufferLength;
+        x = 0;
+        for (i = 0; i < bufferLength; i++) {
+            v = audioArray[i] / 128.0;
+            y = canvas.height - v * canvas.height / 2;
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+            x += sliceWidth;
+        }
+        ctx.lineTo(canvas.width, canvas.height);
+        ctx.stroke();
+    }
+
+    /* VIZ END */
 
     var animFrame = void 0;
     return {
