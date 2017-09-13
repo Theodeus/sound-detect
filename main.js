@@ -50,12 +50,12 @@ navigator.mediaDevices.getUserMedia(constraints).then(function (mediaStream) {
     var scriptNode = context.createScriptProcessor(2048, 1, 1);
 
     scriptNode.onaudioprocess = function (event) {
-        if (detect) {
-            console.log(pitchFinder(event.inputBuffer.getChannelData(0)));
-
-            //it's a good idea to experiment with applying some kind of smoothing here,
-            // like averaging three frames from when the first pitch is detected, or something like that
-        }
+        // if (detect) {
+        // console.log(pitchFinder(event.inputBuffer.getChannelData(0)));
+        document.getElementById("pitch").innerHTML = pitchFinder(event.inputBuffer.getChannelData(0));
+        //it's a good idea to experiment with applying some kind of smoothing here,
+        // like averaging three frames from when the first pitch is detected, or something like that
+        // }
     };
 
     //route the audio for pitch detection
@@ -88,26 +88,25 @@ navigator.mediaDevices.getUserMedia(constraints).then(function (mediaStream) {
 });
 
 function createAudioChain(context, midFrequency, range, threshold) {
-    var filter1 = context.createBiquadFilter();
-    filter1.type = "bandpass";
-    filter1.Q.value = 10 * range;
-    filter1.frequency.value = midFrequency;
-    filter1.gain.value = -64;
-    var filter2 = context.createBiquadFilter();
-    filter2.type = "bandpass";
-    filter2.Q.value = 10 * range;
-    filter2.frequency.value = midFrequency;
-    filter2.gain.value = -64;
-    var filter3 = context.createBiquadFilter();
-    filter3.type = "bandpass";
-    filter3.Q.value = 10 * range;
-    filter3.frequency.value = midFrequency;
-    filter3.gain.value = -64;
-    var filter4 = context.createBiquadFilter();
-    filter4.type = "bandpass";
-    filter4.Q.value = 10 * range;
-    filter4.frequency.value = midFrequency;
-    filter4.gain.value = -64;
+
+    var input = void 0;
+    var currFilter = false;
+    var prevFilter = false;
+    var bgColor = void 0;
+
+    for (var _i = 0; _i < 6; _i++) {
+        prevFilter = currFilter;
+        currFilter = context.createBiquadFilter();
+        currFilter.type = "bandpass";
+        currFilter.Q.value = 10 * range;
+        currFilter.frequency.value = midFrequency;
+        currFilter.gain.value = -64;
+        if (prevFilter) {
+            prevFilter.connect(currFilter);
+        } else {
+            input = currFilter;
+        }
+    }
 
     var gate = context.createAnalyser();
     gate.fftSize = 256;
@@ -121,16 +120,15 @@ function createAudioChain(context, midFrequency, range, threshold) {
             return a + b;
         });
         if (energy / bufferLength > threshold) {
-            console.log(midFrequency, "triggered with an energy value of", energy / bufferLength);
+            bgColor = "#ccffcc";
+        } else {
+            bgColor = "#cccccc";
         }
         draw();
         requestAnimationFrame(gateInput);
     }
 
-    filter1.connect(filter2);
-    filter2.connect(filter3);
-    filter3.connect(filter4);
-    filter4.connect(gate);
+    currFilter.connect(gate);
 
     /* VIZ */
 
@@ -147,12 +145,12 @@ function createAudioChain(context, midFrequency, range, threshold) {
         i = void 0,
         sliceWidth = void 0;
     function draw() {
-        ctx.fillStyle = 'rgb(200, 200, 200)';
+        ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.lineWidth = 2;
         ctx.strokeStyle = 'rgb(0, 0, 0)';
         ctx.beginPath();
-        sliceWidth = canvas.width * 1.0 / bufferLength;
+        sliceWidth = canvas.width * 5 / bufferLength;
         x = 0;
         for (i = 0; i < bufferLength; i++) {
             v = audioArray[i] / 128.0;
@@ -172,7 +170,7 @@ function createAudioChain(context, midFrequency, range, threshold) {
 
     var animFrame = void 0;
     return {
-        input: filter1,
+        input: input,
         output: gate,
         start: function start(_) {
             animFrame = requestAnimationFrame(gateInput);
